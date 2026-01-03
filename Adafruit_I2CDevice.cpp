@@ -28,7 +28,22 @@ Adafruit_I2CDevice::Adafruit_I2CDevice(uint8_t addr, TwoWire *theWire) {
  *    @return True if I2C initialized and a device with the addr found
  */
 bool Adafruit_I2CDevice::begin(bool addr_detect) {
+  // On ESP32 (especially with the newer I2C NG/driver_ng stack), calling
+  // TwoWire::begin() again when the bus is already configured can produce
+  // warnings ("Bus already started") and, in some setups, transient
+  // ESP_ERR_INVALID_STATE errors during early boot.
+  //
+  // Try a lightweight probe first; only call begin() if the bus appears
+  // uninitialized.
+#if defined(ESP32)
+  _wire->beginTransmission(_addr);
+  uint8_t err = _wire->endTransmission();
+  if (err == 4) {
+    _wire->begin();
+  }
+#else
   _wire->begin();
+#endif
   _begun = true;
 
   if (addr_detect) {
